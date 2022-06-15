@@ -4,27 +4,26 @@ import uvicorn
 import numpy as np
 from io import BytesIO
 from PIL import Image
-from tensorflow import keras
 from keras.models import load_model
+import cv2
 
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
-MODEL = load_model("wheatleaf.h5")
+MODEL = load_model("wheatleaf3.h5")
 
-CLASS_NAMES = ["healthy", "Leaf Rust", "Stem Rust"]
+CLASS_NAMES = ["Healthy", "septoria", "stripe_rust"]
 
+@app.get("/")
+async def home():
+    return "Hello, I am Home"
 
 @app.get("/ping")
 async def ping():
@@ -32,13 +31,15 @@ async def ping():
 
 
 def read_file_as_image(data) -> np.ndarray:
-    image = np.array(Image.open(BytesIO(data)))
+    img = np.array(Image.open(BytesIO(data)))
+    image = cv2.resize(img, dsize=(256, 256), interpolation=cv2.INTER_CUBIC)
     return image
 
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     image = read_file_as_image(await file.read())
+  
     img_batch = np.expand_dims(image, 0)
 
     predictions = MODEL.predict(img_batch)
@@ -49,4 +50,4 @@ async def predict(file: UploadFile = File(...)):
 
 
 if __name__ == "__main__":
-      uvicorn.run(app, debug=True)
+   uvicorn.run(app, host="0.0.0.0", port=8000)
